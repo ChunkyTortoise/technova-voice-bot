@@ -34,7 +34,7 @@ Browser (OGG/Opus) → WebSocket → FFmpeg (OGG→PCM16) → Silero VAD (ONNX)
 ### Local Development
 
 ```bash
-git clone ...
+git clone https://github.com/ChunkyTortoise/technova-voice-bot.git
 cd technova-voice-bot
 
 # Install dependencies

@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncio
 from typing import Callable, Awaitable
 import httpx
 from app.config import settings

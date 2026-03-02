@@ -1,8 +1,7 @@
 from __future__ import annotations
 import json
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.asyncio
@@ -93,7 +92,7 @@ async def test_release_redis_lock():
 @pytest.mark.asyncio
 async def test_session_lock_per_session():
     """FIX #9: Verify each session gets its own asyncio.Lock."""
-    from app.session_manager import get_session_lock, _session_locks
+    from app.session_manager import get_session_lock
     lock_a = await get_session_lock("session-a")
     lock_b = await get_session_lock("session-b")
     assert lock_a is not lock_b
