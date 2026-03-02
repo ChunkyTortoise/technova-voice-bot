@@ -1,0 +1,43 @@
+# TechNova Voice AI Bot — Render deployment
+# FIX #11: Redis defined in this file so fromService reference is not broken
+
+services:
+  - type: web
+    name: technova-voice-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DEEPGRAM_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: REDIS_URL
+        fromService:
+          name: technova-redis
+          type: redis
+          property: connectionString
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/technova.db
+      # FIX #6: Set CORS to exact deployed URL (not *)
+      - key: CORS_ORIGINS
+        value: '["https://technova-voice-bot.onrender.com"]'
+      - key: ENVIRONMENT
+        value: production
+      - key: LOCK_TTL_SECONDS
+        value: "30"
+      - key: MAX_CONCURRENT_WS_PER_IP
+        value: "5"
+      - key: SENTENCE_FLUSH_TIMEOUT_MS
+        value: "500"
+    disk:
+      name: technova-data
+      mountPath: /app/data
+      sizeGB: 1
+
+  # FIX #11: Redis service defined here (not just referenced)
+  - type: redis
+    name: technova-redis
+    plan: free
+    ipAllowList: []

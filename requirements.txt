@@ -1,0 +1,14 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=13.0
+anthropic>=0.40.0
+deepgram-sdk>=3.7.0,<4.0.0
+aiosqlite>=0.20.0
+sqlalchemy[asyncio]>=2.0.0
+redis[asyncio]>=5.0.0
+onnxruntime>=1.19.0
+httpx>=0.27.0
+pydantic-settings>=2.0.0
+structlog>=24.4.0
+python-multipart>=0.0.12
+numpy>=1.26.0
