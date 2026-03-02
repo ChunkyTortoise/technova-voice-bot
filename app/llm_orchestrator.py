@@ -10,6 +10,17 @@ from app.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Module-level client singleton — reuses connection pool across calls
+_anthropic_client: anthropic.AsyncAnthropic | None = None
+
+
+def _get_client() -> anthropic.AsyncAnthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+    return _anthropic_client
+
+
 # FIX #7: Robust sentence splitting.
 # Python re doesn't support variable-width lookbehinds, so we use a fixed-width
 # split on ". " (not after digit) plus post-processing to handle abbreviations.
@@ -91,7 +102,7 @@ async def generate_response(
         ]
         messages.append({"role": "user", "content": user_text})
 
-        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = _get_client()
         full_response = ""
         buffer = ""
         flush_timeout = settings.SENTENCE_FLUSH_TIMEOUT_MS / 1000.0

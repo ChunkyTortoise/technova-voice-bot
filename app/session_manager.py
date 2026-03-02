@@ -2,7 +2,6 @@ from __future__ import annotations
 import json
 import asyncio
 from datetime import datetime, timezone
-from typing import Any
 import redis.asyncio as aioredis
 from app.config import settings
 from app.database import save_message, create_session as db_create_session
@@ -79,13 +78,8 @@ async def append_message(session_id: str, role: str, content: str) -> None:
     await r.rpush(key, json.dumps(message))
     await r.expire(key, settings.SESSION_TTL_SECONDS)
 
-    # Flush to DB every 5 messages
-    count = await r.llen(key)
-    if count % 5 == 0:
-        await save_message(session_id, role, content)
-        logger.debug("message_flushed_to_db", session_id=session_id, count=count)
-    else:
-        await save_message(session_id, role, content)
+    # Always persist to DB (Redis is the fast cache; SQLite is the durable store)
+    await save_message(session_id, role, content)
 
 
 # FIX #9: Redis distributed lock (for multi-process; asyncio.Lock used in routes)

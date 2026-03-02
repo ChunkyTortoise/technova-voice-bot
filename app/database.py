@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, select
 from sqlalchemy.orm import DeclarativeBase, relationship
 from app.config import settings
@@ -39,11 +39,6 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("database_initialized", url=settings.DATABASE_URL)
-
-
-async def get_db():
-    async with AsyncSessionLocal() as db:
-        yield db
 
 
 async def create_session(session_id: str) -> None:

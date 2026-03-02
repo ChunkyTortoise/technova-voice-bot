@@ -72,7 +72,6 @@ class AudioPipeline:
         self.session_id = session_id
         self.on_speech_end = on_speech_end
         self._ffmpeg: subprocess.Popen | None = None
-        self._pcm_buffer: bytes = b""
         self._speech_buffer: bytes = b""
         self._in_speech = False
         self._silence_start: float | None = None
@@ -111,7 +110,7 @@ class AudioPipeline:
     async def _read_pcm(self) -> None:
         """Read PCM16 output from FFmpeg and run VAD."""
         frame_bytes = FRAME_SAMPLES * 2  # 16-bit samples
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         while self._ffmpeg and self._ffmpeg.poll() is None:
             if not self._ffmpeg.stdout:
@@ -151,12 +150,24 @@ class AudioPipeline:
         """Cleanup FFmpeg process."""
         if self._read_task:
             self._read_task.cancel()
+            try:
+                await self._read_task
+            except asyncio.CancelledError:
+                pass
         if self._ffmpeg:
             try:
                 if self._ffmpeg.stdin:
                     self._ffmpeg.stdin.close()
                 self._ffmpeg.terminate()
-                self._ffmpeg.wait(timeout=2)
+                # Non-blocking wait via executor to avoid blocking the event loop
+                loop = asyncio.get_running_loop()
+                try:
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, self._ffmpeg.wait),
+                        timeout=2.0,
+                    )
+                except asyncio.TimeoutError:
+                    self._ffmpeg.kill()
             except Exception:
                 self._ffmpeg.kill()
         logger.info("audio_pipeline_stopped", session_id=self.session_id)

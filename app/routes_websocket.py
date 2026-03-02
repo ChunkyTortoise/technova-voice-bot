@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import json
+import uuid as _uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.config import settings
 from app.ws_manager import manager
@@ -22,6 +23,13 @@ async def audio_websocket(websocket: WebSocket, session_id: str):
     FIX #8: Rate limit by IP (max MAX_CONCURRENT_WS_PER_IP per IP)
     FIX #18: Handle ping messages for keepalive
     """
+    # Validate session_id is a well-formed UUID to prevent Redis key pollution
+    try:
+        _uuid.UUID(session_id)
+    except ValueError:
+        await websocket.close(code=1008, reason="Invalid session_id format")
+        return
+
     # FIX #8: Check concurrent connections per IP
     client_ip = websocket.client.host if websocket.client else "unknown"
     current_count = manager.get_connection_count_for_ip(client_ip)
@@ -51,6 +59,8 @@ async def audio_websocket(websocket: WebSocket, session_id: str):
 
     async def on_speech_end(pcm_data: bytes) -> None:
         """Called when VAD detects end of user utterance."""
+        if not pcm_data:
+            return
         cancel_event.clear()
         stt = DeepgramSTTClient(on_transcript=on_transcript_received)
         await stt.connect()
