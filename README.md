@@ -1,5 +1,7 @@
 # TechNova Voice AI Customer Service Bot
 
+[![CI](https://github.com/ChunkyTortoise/technova-voice-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ChunkyTortoise/technova-voice-bot/actions/workflows/ci.yml)
+
 A real-time Voice AI demo showcasing a complete voice pipeline — speech-to-text (STT), LLM reasoning via Claude, and text-to-speech (TTS) — for an e-commerce electronics store.
 
 ## Architecture
