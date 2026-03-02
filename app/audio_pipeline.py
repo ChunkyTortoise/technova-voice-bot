@@ -12,7 +12,6 @@ ENDPOINTING_MS = 700  # 700ms silence = end of utterance
 FRAME_SAMPLES = 512   # 32ms at 16kHz
 
 try:
-    import numpy as np
     import onnxruntime as ort
     import urllib.request
     import os

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Awaitable
+from typing import Any, Callable, Awaitable
 from app.config import settings
 from app.utils.logging_config import get_logger
 
@@ -16,7 +16,7 @@ class DeepgramSTTClient:
 
     def __init__(self, on_transcript: Callable[[str], Awaitable[None]]) -> None:
         self.on_transcript = on_transcript
-        self._connection = None
+        self._connection: Any = None
         self._connected = False
 
     async def connect(self) -> None:

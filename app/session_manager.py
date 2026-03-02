@@ -63,7 +63,7 @@ async def session_exists(session_id: str) -> bool:
 
 async def get_conversation(session_id: str) -> list[dict]:
     r = await get_redis()
-    raw = await r.lrange(f"session:{session_id}:messages", 0, -1)
+    raw = await r.lrange(f"session:{session_id}:messages", 0, -1)  # type: ignore[misc]
     return [json.loads(m) for m in raw]
 
 
@@ -75,7 +75,7 @@ async def append_message(session_id: str, role: str, content: str) -> None:
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     key = f"session:{session_id}:messages"
-    await r.rpush(key, json.dumps(message))
+    await r.rpush(key, json.dumps(message))  # type: ignore[misc]
     await r.expire(key, settings.SESSION_TTL_SECONDS)
 
     # Always persist to DB (Redis is the fast cache; SQLite is the durable store)

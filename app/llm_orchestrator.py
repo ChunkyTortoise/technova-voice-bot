@@ -2,8 +2,9 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, cast
 import anthropic
+from anthropic.types import MessageParam
 from app.config import settings
 from app.session_manager import get_conversation, append_message, get_session_lock
 from app.utils.logging_config import get_logger
@@ -112,7 +113,7 @@ async def generate_response(
             model="claude-sonnet-4-6",
             max_tokens=300,
             system=SYSTEM_PROMPT,
-            messages=messages,
+            messages=cast(list[MessageParam], messages),
         ) as stream:
             async for text in stream.text_stream:
                 if cancel_event.is_set():
