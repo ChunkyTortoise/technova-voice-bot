@@ -1,3 +1,9 @@
+![Tests](https://img.shields.io/badge/tests-26%20passing-brightgreen)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
+![WebSocket](https://img.shields.io/badge/WebSocket-realtime-orange)
+![Claude](https://img.shields.io/badge/Claude-Sonnet-blueviolet)
+
 # TechNova Voice AI Customer Service Bot
 
 [![CI](https://github.com/ChunkyTortoise/technova-voice-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ChunkyTortoise/technova-voice-bot/actions/workflows/ci.yml)

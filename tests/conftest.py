@@ -36,7 +36,6 @@ async def app_client():
     """Async test client with mocked external services."""
     with patch("app.session_manager.get_redis") as mock_get_redis, \
          patch("app.session_manager._redis_client", new=None), \
-         patch("app.database.init_db", new_callable=AsyncMock), \
          patch("app.database.create_session", new_callable=AsyncMock), \
          patch("app.database.save_message", new_callable=AsyncMock), \
          patch("app.database.get_session_history", return_value=[]):
@@ -53,6 +52,8 @@ async def app_client():
         mock_redis.aclose = AsyncMock()
         mock_get_redis.return_value = mock_redis
 
+        from app.database import init_db
         from app.main import app
+        await init_db()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield client

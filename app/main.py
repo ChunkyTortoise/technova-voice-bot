@@ -15,10 +15,18 @@ configure_logging()
 logger = get_logger(__name__)
 
 
+DEMO_MODE = not settings.DEEPGRAM_API_KEY or not settings.ANTHROPIC_API_KEY
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle."""
     logger.info("startup_begin", version=settings.VERSION, env=settings.ENVIRONMENT)
+    if DEMO_MODE:
+        logger.warning(
+            "demo_mode_active",
+            reason="DEEPGRAM_API_KEY and/or ANTHROPIC_API_KEY not set — running with mock clients",
+        )
     # Ensure data directory exists (for SQLite)
     os.makedirs("data", exist_ok=True)
     await init_db()

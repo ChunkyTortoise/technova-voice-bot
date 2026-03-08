@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     VERSION: str = "1.0.0"
     SENTENCE_FLUSH_TIMEOUT_MS: int = 500  # FIX #7, #14: flush buffer after 500ms
+    ADMIN_API_KEY: str = ""
+    OPERATOR_API_KEY: str = ""
+    VIEWER_API_KEY: str = ""
 
 
 settings = Settings()

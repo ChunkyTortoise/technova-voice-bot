@@ -9,11 +9,18 @@ from app.audio_pipeline import AudioPipeline
 from app.stt_client import DeepgramSTTClient
 from app.tts_client import DeepgramTTSClient
 from app.llm_orchestrator import generate_response
+from app.mock_clients import MockLLMOrchestrator, MockTTSClient
 from app.session_manager import session_exists
 from app.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+DEMO_MODE = not settings.DEEPGRAM_API_KEY or not settings.ANTHROPIC_API_KEY
+
+if DEMO_MODE:
+    _mock_llm = MockLLMOrchestrator()
+    _mock_tts = MockTTSClient()
 
 
 @router.websocket("/ws/audio/{session_id}")
@@ -53,19 +60,26 @@ async def audio_websocket(websocket: WebSocket, session_id: str):
 
     async def on_tts_sentence(sentence: str) -> None:
         if not cancel_event.is_set():
-            tts = DeepgramTTSClient(on_audio_chunk=on_audio_chunk)
-            await manager.send_event(session_id, {"type": "bot_start"})
-            await tts.synthesize(sentence)
+            if DEMO_MODE:
+                audio = await _mock_tts.synthesize(sentence)
+                await manager.send_audio(session_id, audio)
+            else:
+                tts = DeepgramTTSClient(on_audio_chunk=on_audio_chunk)
+                await manager.send_event(session_id, {"type": "bot_start"})
+                await tts.synthesize(sentence)
 
     async def on_speech_end(pcm_data: bytes) -> None:
         """Called when VAD detects end of user utterance."""
         if not pcm_data:
             return
         cancel_event.clear()
-        stt = DeepgramSTTClient(on_transcript=on_transcript_received)
-        await stt.connect()
-        await stt.send_audio(pcm_data)
-        await stt.disconnect()
+        if DEMO_MODE:
+            await on_transcript_received("Demo user speech detected")
+        else:
+            stt = DeepgramSTTClient(on_transcript=on_transcript_received)
+            await stt.connect()
+            await stt.send_audio(pcm_data)
+            await stt.disconnect()
 
     async def on_transcript_received(text: str) -> None:
         if not text.strip():
@@ -73,12 +87,17 @@ async def audio_websocket(websocket: WebSocket, session_id: str):
         await manager.send_event(session_id, {"type": "transcript", "text": text})
         logger.info("pipeline_transcript", session_id=session_id, text=text[:80])
         try:
-            await generate_response(
-                session_id=session_id,
-                user_text=text,
-                on_sentence=on_tts_sentence,
-                cancel_event=cancel_event,
-            )
+            if DEMO_MODE:
+                response = await _mock_llm.generate_response(text, session_id)
+                await manager.send_event(session_id, {"type": "bot_start"})
+                await on_tts_sentence(response)
+            else:
+                await generate_response(
+                    session_id=session_id,
+                    user_text=text,
+                    on_sentence=on_tts_sentence,
+                    cancel_event=cancel_event,
+                )
             await manager.send_event(session_id, {"type": "bot_end"})
         except Exception as e:
             logger.error("pipeline_error", session_id=session_id, error=str(e))
