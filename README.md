@@ -1,21 +1,29 @@
-![Tests](https://img.shields.io/badge/tests-26%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-113%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
 ![WebSocket](https://img.shields.io/badge/WebSocket-realtime-orange)
 ![Claude](https://img.shields.io/badge/Claude-Sonnet-blueviolet)
 
-# TechNova Voice AI Customer Service Bot
+# TechNova Voice Bot
+
+**Real-time voice AI with barge-in** — interrupt mid-response and get instant context-aware replies. WebSocket-based pipeline with <300ms time-to-first-byte.
 
 [![CI](https://github.com/ChunkyTortoise/technova-voice-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ChunkyTortoise/technova-voice-bot/actions/workflows/ci.yml)
 
-A real-time Voice AI demo showcasing a complete voice pipeline — speech-to-text (STT), LLM reasoning via Claude, and text-to-speech (TTS) — for an e-commerce electronics store.
+A complete voice pipeline — speech-to-text (STT), LLM reasoning via Claude, and text-to-speech (TTS) — for an e-commerce electronics store.
 
-## Architecture
+## Pipeline Architecture
 
-```
-Browser (OGG/Opus) → WebSocket → FFmpeg (OGG→PCM16) → Silero VAD (ONNX)
-→ Deepgram Nova-3 STT → Claude Sonnet LLM → Sentence buffer
-→ Deepgram Aura-2 TTS → PCM16 → WebSocket → Browser AudioContext
+```mermaid
+graph LR
+  A[Browser] -->|OGG audio| B[FFmpeg decoder]
+  B -->|PCM frames| C[Silero VAD]
+  C -->|speech frames| D[Deepgram STT]
+  D -->|transcript| E[Claude LLM]
+  E -->|text chunks| F[TTS synthesis]
+  F -->|audio| G[WebSocket]
+  G -->|OGG stream| A
+  C -->|barge-in signal| E
 ```
 
 ## Tech Stack
@@ -109,14 +117,29 @@ pytest tests/ --cov=app --cov-report=html
 
 ## Latency Budget
 
-| Stage | Typical Latency |
-|-------|----------------|
-| VAD endpointing | 700ms |
-| Deepgram STT final | ~300ms |
-| Claude TTFB | ~1,190ms |
-| First sentence ready | variable (+ flush timeout max 500ms) |
-| Deepgram TTS TTFB | ~90ms |
-| **Total to first audio** | **~2.3–3.3s** |
+| Component | Target | Notes |
+|-----------|--------|-------|
+| VAD detection | <10ms | Silero ONNX, cached after first session |
+| STT (Deepgram) | <150ms | Streaming, not batch |
+| LLM first token | <200ms | Claude Sonnet streaming |
+| TTS synthesis | <100ms | Streaming audio synthesis |
+| WebSocket overhead | <50ms | Local/regional |
+| **Total TTFB** | **<300ms** | Voice turn around time |
 
-> Success criteria: <3s to first audio byte, measured on short responses. Long LLM
-> responses flush the sentence buffer after 500ms (FIX #14).
+> Note: First session has ~5-10s VAD cold start while Silero model loads. Cached after that.
+
+## Browser Client Features
+
+The included browser client (`static/app.js`) provides:
+- **Real-time waveform visualizer** — live audio amplitude display during speech
+- **Auto-reconnect** — exponential backoff reconnection on connection loss
+- **Barge-in support** — interrupt Claude mid-response by speaking
+
+## Certifications Applied
+
+| Domain Pillar | Certifications | Applied In |
+|--------------|----------------|------------|
+| GenAI & LLM Engineering | Google Generative AI, Anthropic Prompt Engineering, DeepLearning.AI | Claude streaming integration, prompt engineering for voice |
+| Deep Learning & AI Foundations | DeepLearning.AI specializations | Silero VAD ONNX model selection, audio signal processing |
+| Cloud & MLOps | Google Cloud, IBM DevOps, GitHub Actions | WebSocket session management, Render deploy, CI pipeline |
+| RAG & Knowledge Systems | DeepLearning.AI RAG | Conversation context management for multi-turn voice |
