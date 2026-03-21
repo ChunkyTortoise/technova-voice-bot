@@ -108,10 +108,30 @@ docker-compose up
 | #16 | Order demo invisible | UI hint: "Try order TN-10023 or TN-10042" |
 | #18 | Render 75s WS idle timeout | Client sends ping every 30s |
 
+## Demo Mode
+
+Run without any API keys — the bot responds with pre-scripted demo answers:
+
+```bash
+# Demo mode — no DEEPGRAM_API_KEY or ANTHROPIC_API_KEY required
+DEMO_MODE=true uvicorn app.main:app --reload --port 8000
+# Open http://localhost:8000
+```
+
+Demo mode activates automatically when `DEEPGRAM_API_KEY` is not set. It mocks STT, LLM, and TTS so you can exercise the full WebSocket pipeline without API credits.
+
+| Feature | Live Mode | Demo Mode |
+|---------|-----------|-----------|
+| STT | Deepgram Nova-3 streaming | Pre-scripted responses |
+| LLM | Claude Sonnet streaming | Mock responses |
+| TTS | Deepgram Aura-2 | Silent audio |
+| Barge-in | Real VAD | Simulated |
+| Sessions | Redis + SQLite | In-memory |
+
 ## Testing
 
 ```bash
-pytest tests/ -v
+pytest tests/ -v            # 113 tests
 pytest tests/ --cov=app --cov-report=html
 ```
 
