@@ -1,4 +1,4 @@
-![Tests](https://img.shields.io/badge/tests-113%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-171%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
 ![WebSocket](https://img.shields.io/badge/WebSocket-realtime-orange)
@@ -147,6 +147,14 @@ pytest tests/ --cov=app --cov-report=html
 | **Total TTFB** | **<300ms** | Voice turn around time |
 
 > Note: First session has ~5-10s VAD cold start while Silero model loads. Cached after that.
+
+## Production Features
+
+- **Pipeline Latency Tracker** — component-level timing (STT, LLM TTFB, LLM total, TTS, E2E) with P50/P95/P99 percentile histograms. GET `/api/metrics/latency`
+- **Circuit Breaker + Model Fallback** — per-service async circuit breakers (CLOSED/OPEN/HALF_OPEN). LLM fallback: Sonnet to Haiku on circuit open. TTS fallback: text-only. GET `/api/health/circuits`
+- **Function Calling / Tool Use** — Claude tool_use API with 3 voice-enabled tools (order lookup, product search, callback scheduling). Multi-turn tool loop with max 3 iterations. Tool call events streamed to browser
+- **Per-Call Cost Tracker** — USD cost breakdown per turn (Deepgram STT + Anthropic LLM + TTS). Model-aware pricing (Sonnet vs Haiku). GET `/api/costs/summary`
+- **Semantic Caching** — (planned) embedding similarity cache for repeated queries
 
 ## Browser Client Features
 

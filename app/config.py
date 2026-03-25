@@ -21,5 +21,22 @@ class Settings(BaseSettings):
     OPERATOR_API_KEY: str = ""
     VIEWER_API_KEY: str = ""
 
+    # Circuit breaker
+    LLM_FALLBACK_MODEL: str = "claude-haiku-4-5-20251001"
+    CIRCUIT_BREAKER_THRESHOLD: int = 3
+    CIRCUIT_BREAKER_RECOVERY_SEC: float = 30.0
+
+    # Tool use / function calling
+    TOOL_USE_ENABLED: bool = True
+    MAX_TOOL_ITERATIONS: int = 3
+
+    # Cost tracking (USD pricing)
+    COST_STT_PER_MINUTE: float = 0.0043        # Deepgram Nova-3
+    COST_LLM_INPUT_PER_1K: float = 0.003       # Claude Sonnet input
+    COST_LLM_OUTPUT_PER_1K: float = 0.015      # Claude Sonnet output
+    COST_LLM_HAIKU_INPUT_PER_1K: float = 0.00025   # Claude Haiku input
+    COST_LLM_HAIKU_OUTPUT_PER_1K: float = 0.00125  # Claude Haiku output
+    COST_TTS_PER_1K_CHARS: float = 0.011       # Deepgram Aura-2
+
 
 settings = Settings()

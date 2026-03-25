@@ -14,7 +14,7 @@ Real-time voice pipeline: OGG → FFmpeg → Silero VAD → Deepgram STT → Cla
 Not yet deployed. Target: Render. URL will be `https://technova-voice-bot.onrender.com`. Guide: `output/technova-deploy-guide.md`. Needs Deepgram free tier ($200 credit).
 
 ## Test
-```pytest tests/  # 26 tests```
+```pytest tests/  # 171 tests```
 
 ## Key Env
 DEEPGRAM_API_KEY, ANTHROPIC_API_KEY, REDIS_URL

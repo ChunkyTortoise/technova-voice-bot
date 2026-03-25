@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from dataclasses import dataclass
 from typing import Callable, Awaitable, cast
 import anthropic
 from anthropic.types import MessageParam
@@ -10,6 +11,17 @@ from app.session_manager import get_conversation, append_message, get_session_lo
 from app.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class TurnResult:
+    """Result of a single LLM generation turn with timing metadata."""
+    text: str
+    ttfb_ms: float = 0.0
+    total_ms: float = 0.0
+    tokens_in: int = 0
+    tokens_out: int = 0
+    model_used: str = ""
 
 # Module-level client singleton — reuses connection pool across calls
 _anthropic_client: anthropic.AsyncAnthropic | None = None
@@ -79,7 +91,71 @@ VOICE GUIDELINES:
 - Speak naturally as if in a phone conversation
 - Do not use bullet points or numbered lists
 - Spell out prices naturally (say "nineteen ninety-nine" not "$19.99")
-- Use contractions and friendly language"""
+- Use contractions and friendly language
+
+TOOLS:
+You have access to tools for looking up order status, searching products, and scheduling callbacks.
+Use them when the customer asks about an order, wants product recommendations, or requests a callback.
+After using a tool, summarize the result naturally in your spoken response."""
+
+
+async def _run_tool_loop(
+    client: anthropic.AsyncAnthropic,
+    messages: list[dict],
+    model: str,
+    cancel_event: asyncio.Event,
+    on_tool_call: Callable[[str, dict], Awaitable[None]] | None = None,
+) -> tuple[list[dict], int, int]:
+    """Run the tool_use loop until Claude returns end_turn or max iterations.
+
+    Returns (updated_messages, total_tokens_in, total_tokens_out).
+    """
+    from app.tools import TOOL_DEFINITIONS, execute_tool
+
+    total_in = 0
+    total_out = 0
+
+    for _ in range(settings.MAX_TOOL_ITERATIONS):
+        if cancel_event.is_set():
+            break
+
+        response = await client.messages.create(
+            model=model,
+            max_tokens=300,
+            system=SYSTEM_PROMPT,
+            messages=cast(list[MessageParam], messages),
+            tools=TOOL_DEFINITIONS,
+        )
+        total_in += response.usage.input_tokens
+        total_out += response.usage.output_tokens
+
+        if response.stop_reason != "tool_use":
+            # Extract text from content blocks
+            text_parts = [b.text for b in response.content if hasattr(b, "text")]
+            if text_parts:
+                messages.append({"role": "assistant", "content": "".join(text_parts)})
+            break
+
+        # Find tool_use block
+        tool_block = next((b for b in response.content if b.type == "tool_use"), None)
+        if not tool_block:
+            break
+
+        if on_tool_call:
+            await on_tool_call(tool_block.name, dict(tool_block.input))
+
+        result = await execute_tool(tool_block.name, dict(tool_block.input))
+
+        # Append assistant response + tool result
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": tool_block.id, "content": result},
+            ],
+        })
+
+    return messages, total_in, total_out
 
 
 async def generate_response(
@@ -87,9 +163,12 @@ async def generate_response(
     user_text: str,
     on_sentence: Callable[[str], Awaitable[None]],
     cancel_event: asyncio.Event,
-) -> str:
+    model: str = "claude-sonnet-4-6",
+    on_tool_call: Callable[[str, dict], Awaitable[None]] | None = None,
+) -> TurnResult:
     """
     Generate LLM response with streaming sentence delivery.
+    Returns TurnResult with text, timing metadata, and token counts.
     FIX #9: Uses asyncio.Lock per session.
     FIX #7: Robust sentence splitting.
     FIX #14: Flush buffer after SENTENCE_FLUSH_TIMEOUT_MS.
@@ -109,13 +188,65 @@ async def generate_response(
         flush_timeout = settings.SENTENCE_FLUSH_TIMEOUT_MS / 1000.0
         last_chunk_time = time.monotonic()
 
+        from app.circuit_breaker import llm_circuit, CircuitOpenError
+
+        turn_start = time.monotonic()
+        ttfb_ms = 0.0
+        first_chunk = True
+        tokens_in = 0
+        tokens_out = 0
+        actual_model = model
+
+        try:
+            async with llm_circuit:
+                pass  # Pre-check: will raise CircuitOpenError if open
+        except CircuitOpenError:
+            actual_model = settings.LLM_FALLBACK_MODEL
+            logger.warning("llm_circuit_open_fallback", session_id=session_id, fallback=actual_model)
+
+        # Tool use loop (non-streaming) before the streaming response
+        if settings.TOOL_USE_ENABLED:
+            messages, tool_tokens_in, tool_tokens_out = await _run_tool_loop(
+                client=client,
+                messages=messages,
+                model=actual_model,
+                cancel_event=cancel_event,
+                on_tool_call=on_tool_call,
+            )
+            tokens_in += tool_tokens_in
+            tokens_out += tool_tokens_out
+
+            # If tool loop already produced a final text response, stream it directly
+            last_msg = messages[-1] if messages else {}
+            if last_msg.get("role") == "assistant" and isinstance(last_msg.get("content"), str):
+                ttfb_ms = (time.monotonic() - turn_start) * 1000
+                full_response = last_msg["content"]
+                for sentence in split_sentences(full_response):
+                    if cancel_event.is_set():
+                        break
+                    await on_sentence(sentence)
+
+                total_ms = (time.monotonic() - turn_start) * 1000
+                if full_response and not cancel_event.is_set():
+                    await append_message(session_id, "user", user_text)
+                    await append_message(session_id, "assistant", full_response)
+
+                return TurnResult(
+                    text=full_response, ttfb_ms=ttfb_ms, total_ms=total_ms,
+                    tokens_in=tokens_in, tokens_out=tokens_out, model_used=actual_model,
+                )
+
         async with client.messages.stream(
-            model="claude-sonnet-4-6",
+            model=actual_model,
             max_tokens=300,
             system=SYSTEM_PROMPT,
             messages=cast(list[MessageParam], messages),
         ) as stream:
             async for text in stream.text_stream:
+                if first_chunk:
+                    ttfb_ms = (time.monotonic() - turn_start) * 1000
+                    first_chunk = False
+
                 if cancel_event.is_set():
                     logger.info("llm_cancelled", session_id=session_id)
                     break
@@ -127,33 +258,52 @@ async def generate_response(
                 # FIX #7: Split on robust sentence boundaries
                 sentences = split_sentences(buffer)
                 if len(sentences) > 1:
-                    # All but the last are complete sentences
                     for sentence in sentences[:-1]:
                         logger.debug("sentence_ready", text=sentence[:60])
                         await on_sentence(sentence)
                     buffer = sentences[-1]
                 elif len(sentences) == 1 and _BOUNDARY.search(buffer):
-                    # Single sentence with a trailing terminator — emit it
                     await on_sentence(sentences[0])
                     buffer = ""
 
-                # FIX #14: Flush timeout - if buffer accumulates without sentence end
+                # FIX #14: Flush timeout
                 if buffer and (time.monotonic() - last_chunk_time) > flush_timeout:
                     if buffer.strip():
                         logger.debug("sentence_flush_timeout", text=buffer[:60])
                         await on_sentence(buffer.strip())
                         buffer = ""
 
+            # Get token counts from final message
+            try:
+                final_msg = stream.get_final_message()
+                tokens_in = final_msg.usage.input_tokens
+                tokens_out = final_msg.usage.output_tokens
+            except Exception:
+                pass
+
+        total_ms = (time.monotonic() - turn_start) * 1000
+
         # Flush remaining buffer
         if buffer.strip():
             await on_sentence(buffer.strip())
 
-        # FIX #14: Async flush timeout check during streaming
-        # (handled above; this catches post-stream remainder)
-
         if full_response and not cancel_event.is_set():
             await append_message(session_id, "user", user_text)
             await append_message(session_id, "assistant", full_response)
-            logger.info("llm_complete", session_id=session_id, chars=len(full_response))
+            logger.info(
+                "llm_complete",
+                session_id=session_id,
+                chars=len(full_response),
+                ttfb_ms=round(ttfb_ms, 1),
+                total_ms=round(total_ms, 1),
+                model=actual_model,
+            )
 
-        return full_response
+        return TurnResult(
+            text=full_response,
+            ttfb_ms=ttfb_ms,
+            total_ms=total_ms,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            model_used=actual_model,
+        )
