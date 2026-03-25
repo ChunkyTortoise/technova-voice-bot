@@ -8,7 +8,9 @@ from app.ws_manager import manager
 from app.audio_pipeline import AudioPipeline
 from app.stt_client import DeepgramSTTClient
 from app.tts_client import DeepgramTTSClient
-from app.llm_orchestrator import generate_response
+from app.cost_tracker import compute_turn_cost, cost_aggregator
+from app.llm_orchestrator import generate_response, TurnResult
+from app.metrics import PipelineTimings, latency_histogram, timer
 from app.mock_clients import MockLLMOrchestrator, MockTTSClient
 from app.session_manager import session_exists
 from app.utils.logging_config import get_logger
@@ -68,10 +70,14 @@ async def audio_websocket(websocket: WebSocket, session_id: str):
                 await manager.send_event(session_id, {"type": "bot_start"})
                 await tts.synthesize(sentence)
 
+    # Track last PCM data for cost computation (audio duration)
+    _last_pcm_data: list[bytes] = [b""]
+
     async def on_speech_end(pcm_data: bytes) -> None:
         """Called when VAD detects end of user utterance."""
         if not pcm_data:
             return
+        _last_pcm_data[0] = pcm_data
         cancel_event.clear()
         if DEMO_MODE:
             await on_transcript_received("Demo user speech detected")
@@ -86,19 +92,61 @@ async def audio_websocket(websocket: WebSocket, session_id: str):
             return
         await manager.send_event(session_id, {"type": "transcript", "text": text})
         logger.info("pipeline_transcript", session_id=session_id, text=text[:80])
+
+        timings = PipelineTimings(session_id=session_id)
+        tts_chars = 0
+
+        async def on_tts_sentence_tracked(sentence: str) -> None:
+            nonlocal tts_chars
+            tts_chars += len(sentence)
+            await on_tts_sentence(sentence)
+
         try:
             if DEMO_MODE:
                 response = await _mock_llm.generate_response(text, session_id)
                 await manager.send_event(session_id, {"type": "bot_start"})
+                tts_chars += len(response)
                 await on_tts_sentence(response)
             else:
-                await generate_response(
-                    session_id=session_id,
-                    user_text=text,
-                    on_sentence=on_tts_sentence,
-                    cancel_event=cancel_event,
-                )
+                async def on_tool_call(name: str, args: dict) -> None:
+                    await manager.send_event(session_id, {
+                        "type": "tool_call", "name": name, "args": args,
+                    })
+
+                async with timer() as e2e_timer:
+                    turn_result = await generate_response(
+                        session_id=session_id,
+                        user_text=text,
+                        on_sentence=on_tts_sentence_tracked,
+                        cancel_event=cancel_event,
+                        on_tool_call=on_tool_call,
+                    )
+                    timings.llm_ttfb_ms = turn_result.ttfb_ms
+                    timings.llm_total_ms = turn_result.total_ms
+                timings.e2e_ms = e2e_timer.elapsed_ms
+                latency_histogram.record(timings)
+
             await manager.send_event(session_id, {"type": "bot_end"})
+
+            # Compute cost and record
+            if not DEMO_MODE:
+                audio_sec = len(_last_pcm_data[0]) / (16000 * 2) if _last_pcm_data[0] else 0.0
+                turn_cost = compute_turn_cost(
+                    audio_duration_sec=audio_sec,
+                    tokens_in=turn_result.tokens_in,
+                    tokens_out=turn_result.tokens_out,
+                    tts_chars=tts_chars,
+                    model=turn_result.model_used,
+                )
+                cost_aggregator.record(session_id, turn_cost)
+            else:
+                turn_cost = None
+
+            # Send latency + cost breakdown to client
+            event_data = {"type": "latency", **timings.to_dict()}
+            if turn_cost:
+                event_data["cost_usd"] = round(turn_cost.total_cost, 6)
+            await manager.send_event(session_id, event_data)
         except Exception as e:
             logger.error("pipeline_error", session_id=session_id, error=str(e))
             await manager.send_event(session_id, {"type": "error", "message": "Processing error"})

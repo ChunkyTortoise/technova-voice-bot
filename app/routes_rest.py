@@ -353,3 +353,44 @@ async def list_reports(
             for item in fallback[:limit]
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Latency metrics
+# ---------------------------------------------------------------------------
+
+@router.get("/metrics/latency")
+async def get_latency_metrics():
+    """Return P50/P95/P99 latency percentiles for each pipeline component."""
+    from app.metrics import latency_histogram
+    return latency_histogram.get_percentiles()
+
+
+@router.get("/costs/summary")
+async def get_cost_summary():
+    """Return aggregate cost breakdown across all voice turns."""
+    from app.cost_tracker import cost_aggregator
+    return cost_aggregator.get_summary()
+
+
+@router.get("/costs/session/{session_id}")
+async def get_session_cost(session_id: str):
+    """Return total cost for a specific session."""
+    from app.cost_tracker import cost_aggregator
+    return {
+        "session_id": session_id,
+        "total_cost_usd": cost_aggregator.get_session_total(session_id),
+    }
+
+
+@router.get("/health/circuits")
+async def get_circuit_health():
+    """Return circuit breaker states for all external services."""
+    from app.circuit_breaker import llm_circuit, stt_circuit, tts_circuit
+    return {
+        "circuits": [
+            llm_circuit.to_dict(),
+            stt_circuit.to_dict(),
+            tts_circuit.to_dict(),
+        ]
+    }
