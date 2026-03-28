@@ -44,6 +44,12 @@ jobs:
         run: |
           pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Dependency check
+        run: python -m pip check
+
+      - name: Validate offer-kit
+        run: python scripts/validate_offer_kit.py
+
       - name: Run tests
         run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
 

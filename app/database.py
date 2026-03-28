@@ -34,6 +34,17 @@ class Message(Base):
     session = relationship("Session", back_populates="messages")
 
 
+class ExecutiveReport(Base):
+    __tablename__ = "executive_reports"
+    id = Column(String, primary_key=True)
+    generated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    date_from = Column(DateTime(timezone=True), nullable=True)
+    date_to = Column(DateTime(timezone=True), nullable=True)
+    format = Column(String, nullable=False, default="both")
+    files_json = Column(Text, nullable=False, default="[]")
+    summary_json = Column(Text, nullable=False, default="{}")
+
+
 async def init_db() -> None:
     """Create all tables on startup."""
     async with engine.begin() as conn:
@@ -69,3 +80,40 @@ async def get_session_history(session_id: str) -> list[dict]:
             }
             for m in messages
         ]
+
+
+async def save_executive_report(
+    report_id: str,
+    *,
+    date_from: datetime | None,
+    date_to: datetime | None,
+    report_format: str,
+    files_json: str,
+    summary_json: str,
+) -> None:
+    async with AsyncSessionLocal() as db:
+        db.add(
+            ExecutiveReport(
+                id=report_id,
+                date_from=date_from,
+                date_to=date_to,
+                format=report_format,
+                files_json=files_json,
+                summary_json=summary_json,
+            )
+        )
+        await db.commit()
+
+
+async def get_executive_report(report_id: str) -> ExecutiveReport | None:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(ExecutiveReport).where(ExecutiveReport.id == report_id))
+        return result.scalar_one_or_none()
+
+
+async def list_executive_reports(limit: int = 20) -> list[ExecutiveReport]:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(ExecutiveReport).order_by(ExecutiveReport.generated_at.desc()).limit(limit)
+        )
+        return list(result.scalars().all())

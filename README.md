@@ -131,7 +131,7 @@ Demo mode activates automatically when `DEEPGRAM_API_KEY` is not set. It mocks S
 ## Testing
 
 ```bash
-pytest tests/ -v            # 113 tests
+pytest tests/ -v            # 171 tests
 pytest tests/ --cov=app --cov-report=html
 ```
 

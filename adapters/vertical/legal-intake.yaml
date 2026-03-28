@@ -1,0 +1,8 @@
+id: legal-intake
+name: Legal Intake Voice Adapter
+intent: "Configure voice bot for pre-screening legal consultations"
+default_overrides:
+  opening_script: "Collect incident date, injury type, and representation status."
+  escalation_rules:
+    - "mentions emergency or hospitalization => immediate transfer"
+    - "existing attorney = yes => route to specialist"

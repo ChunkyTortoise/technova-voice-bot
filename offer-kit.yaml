@@ -1,0 +1,28 @@
+schema_version: 1
+name: technova-voice-bot
+version: 1.0.0
+positioning: "Voice AI support bot with ROI and executive reporting"
+quickstart:
+  command: "make quickstart-client"
+  sla_days: 7
+environments:
+  required:
+    - DEEPGRAM_API_KEY
+    - ANTHROPIC_API_KEY
+    - REDIS_URL
+    - DATABASE_URL
+deliverables:
+  - Voice session APIs
+  - ROI endpoints (/api/roi/summary, /api/roi/trends)
+  - Report endpoints (/api/reports/generate, /api/reports/{id})
+smoke_tests:
+  - "curl -s http://localhost:8000/api/health"
+  - "curl -s -X POST http://localhost:8000/api/reports/generate"
+acceptance_checklist:
+  - "Voice session creation and history retrieval remain functional"
+  - "ROI endpoints return interpretable operational value metrics"
+  - "Report generation persists retrievable executive artifacts"
+handoff_outputs:
+  - "Voice API credential checklist"
+  - "Sample generated report ID and retrieval payload"
+  - "Smoke test output log"

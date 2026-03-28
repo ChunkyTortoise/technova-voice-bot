@@ -1,0 +1,8 @@
+id: home-services
+name: Home Services Voice Adapter
+intent: "Configure voice bot for service triage and dispatch scheduling"
+default_overrides:
+  opening_script: "Collect service type, urgency, and address."
+  escalation_rules:
+    - "water leak or electrical hazard => emergency dispatch"
+    - "no availability match => transfer to human scheduler"
