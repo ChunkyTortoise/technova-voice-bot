@@ -1,7 +1,7 @@
-![Tests](https://img.shields.io/badge/tests-171%20passing-brightgreen)
-![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![Tests](https://img.shields.io/badge/tests-171%20passing-EA580C)
+![Python](https://img.shields.io/badge/python-3.12%2B-EA580C)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
-![WebSocket](https://img.shields.io/badge/WebSocket-realtime-orange)
+![WebSocket](https://img.shields.io/badge/WebSocket-realtime-EA580C)
 ![Claude](https://img.shields.io/badge/Claude-Sonnet-blueviolet)
 
 # TechNova Voice Bot
@@ -15,6 +15,7 @@ A complete voice pipeline — speech-to-text (STT), LLM reasoning via Claude, an
 ## Pipeline Architecture
 
 ```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#EA580C', 'primaryBorderColor': '#C2410C', 'primaryTextColor': '#E2E8F0', 'lineColor': '#EA580C'}}}%%
 graph LR
   A[Browser] -->|OGG audio| B[FFmpeg decoder]
   B -->|PCM frames| C[Silero VAD]
