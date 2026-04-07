@@ -27,6 +27,17 @@ graph LR
   C -->|barge-in signal| E
 ```
 
+## For Hiring Managers
+
+| If you're evaluating for... | Where to look | What it demonstrates |
+|-----------------------------|--------------|---------------------|
+| **Real-Time / Streaming** | WebSocket pipeline ([`app/pipeline/`](app/pipeline/)), barge-in interrupt handling | Sub-300ms TTFB, bidirectional audio streaming, graceful interruption |
+| **AI / LLM Integration** | Claude reasoning stage ([`app/pipeline/llm.py`](app/pipeline/llm.py)), conversation context management | Production LLM integration with streaming responses and context window management |
+| **Audio / Signal Processing** | Silero VAD ([`app/pipeline/vad.py`](app/pipeline/vad.py)), FFmpeg transcoding, Deepgram STT/TTS | ONNX inference, audio codec handling, voice activity detection |
+| **Systems Engineering** | Redis session persistence, SQLite catalog, demo mode fallback | Graceful degradation when external services unavailable |
+
+---
+
 ## Tech Stack
 
 | Layer | Technology | Why |
