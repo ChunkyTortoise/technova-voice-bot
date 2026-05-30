@@ -13,3 +13,8 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# Local agent artifacts
+.maintenance/
+AGENTS.md.bak-*
+claude-progress.txt
