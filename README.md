@@ -12,6 +12,12 @@
 
 A complete voice pipeline — speech-to-text (STT), LLM reasoning via Claude, and text-to-speech (TTS) — for an e-commerce electronics store.
 
+> **Proof in 30 seconds** -- WebSockets | real-time voice AI | barge-in support | 171 tests
+>
+> **Best fit** -- Applied AI Engineer, AI Engineer, streaming/interaction-heavy AI roles
+>
+> **Why it matters** -- Adds low-latency, real-time systems proof that complements the API and orchestration repos.
+
 ## Pipeline Architecture
 
 ```mermaid
